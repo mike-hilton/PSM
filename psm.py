@@ -151,6 +151,9 @@ class PSM(object):
     return plaintext
 
 def load_config(path):
+  """
+  Loads config, takes a path to a yaml config file
+  """
   def decode_key(key):
     return key.decode("hex")
 
@@ -159,13 +162,12 @@ def load_config(path):
       config = yaml.load(config_file)
   except:
     print "Could not find/open/parse file %s" % path
-
+    return None
 
   if "settings" in config:
     id = config["settings"]["id"]
     privateKey = decode_key(config["settings"]["privateKey"])
     publicKey = decode_key(config["settings"]["publicKey"])
-
     identity = PSM(privateKey, publicKey, id)
   else:
     identity = PSM()
