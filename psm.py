@@ -10,9 +10,9 @@ from nacl.public import PrivateKey, Box
 PSM - Pretty Secure Messaging
 Version: 0.6
 
-Metadata such as sender ID, receiver ID, and labels will not be encrypted - only the data will be encrypted.
-PSP messages are intended to be sent over encrypted channel, for example using TLS. 
-PSP relies on NaCl for all cryptographic operations. 
+Metadata such as sender ID, receiver ID, and labels will not be encrypted - only the payload data will be encrypted.
+PSM messages are intended to be sent over encrypted channel, for example using TLS. 
+PSM relies on NaCl for all cryptographic operations. 
 NaCl uses Curve25519 for public and private key generation and Salsa20 stream cipher for encryption with Poly1305 MAC authentication.
 """
 
