@@ -17,7 +17,7 @@ NaCl uses Curve25519 for public and private key generation and Salsa20 stream ci
 
 WARNING:
   - Metadata such as sender ID, receiver ID, and labels will not be encrypted - only the payload data will be encrypted.
-  - Currently vulnerable to reply attacks
+  - Currently vulnerable to replay attacks
 """
 
 class PSM(object):
