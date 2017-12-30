@@ -77,8 +77,8 @@ class PSM(object):
 
   def secretkey_encrypt_message(self, message="", label=""):
     """
-    Takes (string) label and (string) message and optional a (string) category class
-    Encrypts the message with the symmetric key
+    Takes a (string) label and a (string) message
+    Encrypts the message with the labels symmetric key
     Returns a dict as Base64 encoded json string containen the encrypted data and the shared key label encrypted
     by the shared key {"data": "KwiffnwOF289r28fj2", "label": "client", "sender": "fokewof"}
     """
