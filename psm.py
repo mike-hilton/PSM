@@ -3,13 +3,14 @@ import base64
 import binascii
 import yaml
 import os
+import random
 import nacl.utils
 import nacl.secret
 from nacl.public import PrivateKey, Box
 
 """
 PSM - Pretty Secure Messaging
-Version: 0.6
+Version: 0.7
 
 PSM messages are intended to be sent over encrypted channel, for example using TLS. 
 PSM relies on NaCl for all cryptographic operations. 
@@ -17,7 +18,7 @@ NaCl uses Curve25519 for public and private key generation and Salsa20 stream ci
 
 WARNING:
   - Metadata such as sender ID, receiver ID, and labels will not be encrypted - only the payload data will be encrypted.
-  - Currently vulnerable to replay attacks
+  - Currently vulnerable to certain replay attacks (an attacker could save the first message you send to a certain user, and send it to that user again after the user has restarted the program, i.e re-setted the counter).
 """
 
 class PSM(object):
@@ -29,7 +30,8 @@ class PSM(object):
     self.servers = {}
     self.sharedKeys = {}
     self.preserve_sharedKey = preserve_sharedKey
-    self.counter = os.urandom(4).encode("hex")
+    self.counters = {}
+    self.max_counter = 999999999999
 
     if privateKey == None and publicKey == None:
       self.privateKey_nacl = PrivateKey.generate()
@@ -41,6 +43,58 @@ class PSM(object):
       self.publicKey_nacl = nacl.public.PublicKey(publicKey)
       self.privateKey_string = privateKey
       self.publicKey_string = publicKey
+
+  def get_counter(self, receivers):
+    receivers.sort()
+    key = receivers + ["_"+self.id]
+    key_string = "".join(key)
+    try:
+      current_counter = self.counters[key_string]
+    except KeyError:
+      random.seed(os.urandom(16))
+      counter = random.randint(0, self.max_counter)
+    else:
+      if counter == self.max_counter:
+        counter = 0
+      else:
+        counter = current_counter + 1
+    return "%012d" % counter
+
+  def verify_counter(self, str_counter, receivers, sender):
+    receivers.sort()
+    receivers.append("_"+sender)
+    key_string = "".join(receivers)
+    try:
+      counter = int(str_counter)
+      previous_counter = self.counters[key_string]
+    except ValueError:
+      print "Error parsing counter"
+      return False
+    except KeyError:
+      print "[INFO] Initiated new counter for sender: %s" % sender
+      self.counters[key_string] = counter
+      return True
+    else:
+      if counter == 0 and previous_counter == self.max_counter:
+        return True
+      elif counter == (previous_counter + 1):
+        return True
+      else:
+        print "[WARNING] Counter is not correct - could be an attempted replay attack!"
+        return False
+
+  def parse_payload(self, data):
+    counter = data[0:12]
+    payload = data[12:]
+    return counter, payload
+
+  def create_payload(self, data, receiver):
+    if type(receiver) == list:
+      counter = self.get_counter(receiver)
+      return counter + data
+    else:
+      raise Exception("[ERROR] Receiver has to be of type list")
+      return None
 
   def add_peer(self, publicKey=None, id=None):
     """
@@ -67,7 +121,7 @@ class PSM(object):
     If no secret key is provided, one will be generated
     """
     if label in self.sharedKeys and self.preserve_sharedKey:
-      raise Exception("Due to current setting exisiting shared keys can not be overwritten")
+      print "Due to current setting exisiting shared keys can not be overwritten"
     else:
       if sharedKey == None:
         sharedKey = nacl.utils.random(nacl.secret.SecretBox.KEY_SIZE).encode("hex")
@@ -77,7 +131,7 @@ class PSM(object):
     try:
       return self.sharedKeys[label]
     except Exception as e:
-      raise Exception("No sharedKey with label: %s" % label)
+      print "No sharedKey with label: %s" % label
       return None
 
   def secretkey_encrypt_message(self, message="", label=""):
@@ -90,7 +144,8 @@ class PSM(object):
     message_box = {"sender": self.id, "type": "sec", "label": label}
     box = nacl.secret.SecretBox(self.sharedKeys[label].decode("hex"))
     try:
-      encrypted = base64.b64encode(box.encrypt(bytes(message)))	
+      payload = self.create_payload(message, [label])
+      encrypted = base64.b64encode(box.encrypt(bytes(payload)))
     except nacl.exceptions.CryptoError as e:
       print str(e)
       return ""
@@ -106,25 +161,26 @@ class PSM(object):
     Returns a dict as Base64 encoded json string containing the encrypted data and its encryption key encrypted by 
     the receivers public key {"data": "KwiffnwOF289r28fj2", "sender": fokewof", "id1":"kof32", "id2":"gjro3", etc...}
     """
-    message_box = {"sender": self.id, "type": "pub"}
-    receiver_box = {}
+    message_box = {"sender": self.id, "type": "pub", "destination": {}}
+    destination = {}
     if category == "servers":
       for server in self.servers:
-        receiver_box[server] = self.servers[server]
+        destination[server] = self.servers[server]
     else:
       for receiver in receivers:
-        receiver_box[receiver] = self.peers[receiver]
+        destination[receiver] = self.peers[receiver]
 
     main_key = nacl.utils.random(nacl.secret.SecretBox.KEY_SIZE)
 
-    for receiver in receiver_box:
-      box = Box(self.privateKey_nacl, receiver_box[receiver]["nacl"])
+    for receiver in destination:
+      box = Box(self.privateKey_nacl, destination[receiver]["nacl"])
       encrypted_key = base64.b64encode(box.encrypt(bytes(main_key)))
-      message_box[receiver] = encrypted_key	
+      message_box["destination"][receiver] = encrypted_key	
 
     box = nacl.secret.SecretBox(main_key)
     try:
-      encrypted = base64.b64encode(box.encrypt(bytes(message)))
+      payload = self.create_payload(message, receivers)
+      encrypted = base64.b64encode(box.encrypt(bytes(payload)))
     except nacl.exceptions.CryptoError as e:
       print str(e)
       return ""
@@ -142,18 +198,27 @@ class PSM(object):
     if message_dict["type"] == "pub":
       sender_publicKey_nacl = self.peers[message_dict["sender"]]["nacl"]
       asymmetric_box = Box(self.privateKey_nacl, sender_publicKey_nacl)
-      main_key = asymmetric_box.decrypt(base64.b64decode(message_dict[self.id]))
+      main_key = asymmetric_box.decrypt(base64.b64decode(message_dict["destination"][self.id]))
       symmetric_box = nacl.secret.SecretBox(main_key)
       plaintext = symmetric_box.decrypt(base64.b64decode(message_dict["data"]))
-      return plaintext	
+      counter, payload = self.parse_payload(plaintext)
+      receivers = message_dict["destination"].keys()
+      if self.verify_counter(counter, receivers, message_dict["sender"]):
+        return payload
+      else:
+        return None
 
     elif message_dict["type"] == "sec":
       if not self.sharedKeys[message_dict["label"]]:
-        raise Exception("Missing sharedKey with label %s" % message_dict["label"])
+        print "Missing sharedKey with label %s" % message_dict["label"]
         return ""
     asymmetric_box = nacl.secret.SecretBox(self.sharedKeys[message_dict["label"]].decode("hex"))
     plaintext = asymmetric_box.decrypt(base64.b64decode(message_dict["data"]))
-    return plaintext
+    counter, payload = self.parse_payload(plaintext)
+    if self.verify_counter(counter, [message_dict["label"]], message_dict["sender"]):
+      return payload
+    else:
+      return None
 
 def load_config(path):
   """
