@@ -38,8 +38,8 @@ class PSM(object):
     if privateKey == None or publicKey == None:
       self.privateKey_nacl = PrivateKey.generate()
       self.publicKey_nacl = self.privateKey_nacl.public_key
-      self.privateKey_string = self.privateKey_nacl.encode()
-      self.publicKey_string = self.publicKey_nacl.encode()
+      self.privateKey_string = self.privateKey_nacl.encode(encoder=nacl.encoding.HexEncoder)
+      self.publicKey_string = self.publicKey_nacl.encode(encoder=nacl.encoding.HexEncoder)
     else:
       self.privateKey_nacl = nacl.public.PrivateKey(privateKey)
       self.publicKey_nacl = nacl.public.PublicKey(publicKey)
@@ -109,15 +109,15 @@ class PSM(object):
 
   def add_peer(self, publicKey=None, id=None):
     """
-    Takes a peer's (string) public key and (string) id and saves that plus NaCl encoded public key in dict
+    Takes a peer's (hex) public key and (string) id and saves that plus NaCl encoded public key in dict
     """
     if publicKey == None or id == None:
       return "Error"
-    self.peers[id] = {"nacl": nacl.public.PublicKey(publicKey), "string": publicKey}
+    self.peers[id] = {"nacl": nacl.public.PublicKey(publicKey.decode("hex")), "string": publicKey}
 	
   def add_server(self, publicKey=None, id=None):
     """
-    Takes a server's (string) public key and (string) id and saves that plus NaCl encoded public key in dict
+    Takes a server's (hex) public key and (string) id and saves that plus NaCl encoded public key in dict
     It also adds the server to self.peers
     """
     if publicKey == None or id == None:
@@ -170,7 +170,7 @@ class PSM(object):
     Creates a symmetric key with which it encrypt the messsage, the symmetric key is encrypted
     using the receivers publik keys
     Returns a dict as Base64 encoded json string containing the encrypted data and its encryption key encrypted by 
-    the receivers public key {"data": "KwiffnwOF289r28fj2", "sender": fokewof", "id1":"kof32", "id2":"gjro3", etc...}
+    the receivers public key {"data": "KwiffnwOF289r28fj2", "sender": fokewof", destination: {"376c692faafd90f33f9adc7d":"5X32+J++nwIR8jChl01VlLBiYKpTvjyaJaq/fS9/Na1/FAp+ZbavUt0ZbAbVKuZYFsQJZmgqLQL6b11d3CJUBlRYRwmh7QjB", etc...}}
     """
     message_box = {"sender": self.id, "type": "pub", "destination": {}}
     destination = {}
