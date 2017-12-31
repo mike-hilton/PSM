@@ -99,7 +99,6 @@ class PSM(object):
   def create_payload(self, data, receiver):
     if self.use_counter == False:
       return data
-
     if type(receiver) == list:
       counter = self.get_counter(receiver)
       return counter + data
