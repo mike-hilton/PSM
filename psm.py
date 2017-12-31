@@ -22,7 +22,7 @@ WARNING:
 """
 
 class PSM(object):
-  def __init__(self, privateKey=None, publicKey=None, id=None, preserve_sharedKey=True):
+  def __init__(self, privateKey=None, publicKey=None, id=None, preserve_sharedKey=True, use_counter=True):
     if id == None:
       id = binascii.hexlify(nacl.utils.random(12))
     self.id = id
@@ -30,8 +30,10 @@ class PSM(object):
     self.servers = {}
     self.sharedKeys = {}
     self.preserve_sharedKey = preserve_sharedKey
-    self.counters = {}
-    self.max_counter = 999999999999
+    self.use_counter = use_counter
+    if self.use_counter:
+      self.counters = {}
+      self.max_counter = 999999999999
 
     if privateKey == None or publicKey == None:
       self.privateKey_nacl = PrivateKey.generate()
@@ -45,6 +47,8 @@ class PSM(object):
       self.publicKey_string = publicKey
 
   def get_counter(self, receivers):
+    if self.use_counter == False:
+      return 0
     receivers.sort()
     key = receivers + ["_"+self.id]
     key_string = "".join(key)
@@ -61,6 +65,8 @@ class PSM(object):
     return "%012d" % counter
 
   def verify_counter(self, str_counter, receivers, sender):
+    if self.use_counter == False:
+      return True
     receivers.sort()
     receivers.append("_"+sender)
     key_string = "".join(receivers)
@@ -84,11 +90,16 @@ class PSM(object):
         return False
 
   def parse_payload(self, data):
+    if self.use_counter == False:
+      return 0, data
     counter = data[0:12]
     payload = data[12:]
     return counter, payload
 
   def create_payload(self, data, receiver):
+    if self.use_counter == False:
+      return data
+
     if type(receiver) == list:
       counter = self.get_counter(receiver)
       return counter + data
