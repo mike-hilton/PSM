@@ -5,6 +5,7 @@ Pretty Secure Messaging
 Based on NaCl, easy to use python class when in need of asymmetric and/or symmetric encryption.
 
 ## Example
+
   me = PSM()
   you = PSM()
   me.add_peer(you.publicKey_string, you.id)
