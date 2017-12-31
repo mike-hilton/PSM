@@ -18,7 +18,7 @@ NaCl uses Curve25519 for public and private key generation and Salsa20 stream ci
 
 WARNING:
   - Metadata such as sender ID, receiver ID, and labels will not be encrypted - only the payload data will be encrypted.
-  - Currently vulnerable to certain replay attacks (an attacker could save the first message you send to a certain user, and send it to that user again after the user has restarted the program, i.e re-setted the counter).
+  - Currently vulnerable to certain replay attacks (an attacker could save the first message you send to a certain user, and send it to that user again after that user has restarted the program, i.e re-setted the counter).
 """
 
 class PSM(object):
