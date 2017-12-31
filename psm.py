@@ -33,7 +33,7 @@ class PSM(object):
     self.counters = {}
     self.max_counter = 999999999999
 
-    if privateKey == None and publicKey == None:
+    if privateKey == None or publicKey == None:
       self.privateKey_nacl = PrivateKey.generate()
       self.publicKey_nacl = self.privateKey_nacl.public_key
       self.privateKey_string = self.privateKey_nacl.encode()
